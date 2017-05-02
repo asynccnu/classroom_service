@@ -1,0 +1,8 @@
+classroom_api:
+    build: .
+    env_file:
+        - container.env
+    command:
+        gunicorn --name classroom_api -b 0.0.0.0:8080 -w 2 wsgi:app
+    ports:
+        - "7090:8080"
