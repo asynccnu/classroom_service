@@ -4,3 +4,7 @@ mongokit==0.9.1.1
 msgpack-python==0.4.8
 pymongo==2.9
 pytz==2016.6.1
+requests
+xlrd
+celery
+redis

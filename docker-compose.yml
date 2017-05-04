@@ -6,3 +6,21 @@ classroom_api:
         gunicorn --name classroom_api -b 0.0.0.0:8080 -w 2 wsgi:app
     ports:
         - "7090:8080"
+    links:
+        - redis1
+
+
+celery:
+    build: .
+    env_file:
+        - container.env
+    command: celery worker -A service.celery --loglevel=INFO
+    links:
+        - redis1
+
+
+redis1:
+    image: redis
+    command: redis-server --port 6383 # Celery Backend
+    ports:
+        - "7383:6383"

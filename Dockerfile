@@ -8,6 +8,7 @@ RUN mkdir -p $DEPLOY_PATH
 WORKDIR $DEPLOY_PATH
 # first add requirements.txt to container
 Add requirements.txt requirements.txt
+Add classroom_table.xls classroom_table.xls
 # install
 RUN pip install --index-url http://pypi.doubanio.com/simple/ -r requirements.txt --trusted-host=pypi.doubanio.com
 # add all !
