@@ -46,7 +46,19 @@ def api_update_classroom():
     """
     table_path = '/classroom_api/classroom_table.xls'
     result = update.apply_async(args=[table_path])
-    return jsonify({}), 200
+    return jsonify({
+        'task_id': result.id
+        }), 201
+
+
+@api.route('/classroom/update_classroom/', methods=['GET'])
+def api_updated_classroom():
+    task_id = request.args.get('task_id')
+    async_res = update.AsyncResult(task_id)
+    if async_res.ready():
+        return jsonify({}), 202
+    else:
+        return jsonify({}), 204
 
 
 @celery.task()
@@ -72,6 +84,7 @@ def update(table_path):
         update_each(each_table)
     change_to_free(u'7', s_all)
     change_to_free(u'8', e_all)
+    return 'ok'
 
 
 def list_minus(a, b):
