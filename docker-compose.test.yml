@@ -1,0 +1,26 @@
+classroom_api_test:
+    build: .
+    env_file:
+        - container.test.env
+    command:
+        python -m tests.__init__
+    ports:
+        - "7090:8080"
+    links:
+        - redis1
+
+
+celery:
+    build: .
+    env_file:
+        - container.test.env
+    command: celery worker -A service.celery --loglevel=INFO
+    links:
+        - redis1
+
+
+redis1:
+    image: redis
+    command: redis-server --port 6383 # Celery Backend
+    ports:
+        - "7383:6383"

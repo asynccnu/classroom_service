@@ -32,7 +32,7 @@ def api_get_classrooom():
             'bno': unicode(building)
             })
         classroom_list = week[weekday]
-        return jsonify(classroom_list)
+        return jsonify(classroom_list), 200
     except:
         return jsonify({}), 502
 
