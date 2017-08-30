@@ -44,7 +44,7 @@ def api_update_classroom():
 
     更新空闲教室表
     """
-    table_path = '/classroom_api/classroom_table.xls'
+    table_path = os.environ.get('TABLE_PATH')
     result = update.apply_async(args=[table_path])
     return jsonify({
         'task_id': result.id
