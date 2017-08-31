@@ -11,9 +11,9 @@ class Week(Document):
     __collection__ = 'weeks'
     __database__ = 'weekdb'
     structure = {
-            'bno': unicode,
-            'weekNo': unicode,
-            'mon': dict,
+            'bno': unicode, # 楼栋号
+            'weekNo': unicode, # 周号
+            'mon': dict, # 这周每天的教室情况
             'tue': dict,
             'wed': dict,
             'thu': dict,

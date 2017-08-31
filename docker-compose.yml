@@ -23,4 +23,4 @@ redis1:
     image: redis
     command: redis-server --port 6383 # Celery Backend
     ports:
-        - "7389:6383"
+        - "7383:6383"
