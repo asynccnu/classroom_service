@@ -24,19 +24,22 @@ ALLROOM8 = [
         ]
 
 
-def update_sheets(all_sheets, connection, Week):
+def update_sheets(all_sheets, connection, Week, init=False, start_sheet=0, start_row=0):
     """
     更新所有年级的课表
 
     all_sheets: 包含各年级课表的xls对象(每列依次为: 上课时间1, 上课时间2, 上课时间3, 上课地点1, 上课地点2, 上课地点3)
     connection: MongoDB的Connection对象
     Week:       MongoDB的Week类
+    init:       是否先初始化课表
+    start_sheet:选择从哪张表开始
+    start_row:  选择从哪一列开始
     """
-    for each_sheet in all_sheets:
-        update_each(each_sheet, connection, Week)
+    for each_sheet in all_sheets[start_sheet:]:
+        update_each(each_sheet, connection, Week, init, start_row)
 
 
-def update_each(sheet, connection, Week):
+def update_each(sheet, connection, Week, init, start_row):
     """
     根据当前年级的课表更新空闲教室表
 
@@ -49,8 +52,8 @@ def update_each(sheet, connection, Week):
         """
         初始化每周每天对应的字典, 初始状态所有教室都空闲
 
-        week_no: 周数
-        bno:     楼栋号(7 或 8)
+        week_no: 周数           int
+        bno:     楼栋号(7 或 8) unicode
         """
 
         def init_weekdays(weekday_list, bno):
@@ -58,31 +61,32 @@ def update_each(sheet, connection, Week):
             将每天对应的节次的空闲教室设定为全部教室
 
             weekday_list: Week实例中'mon'~'fri'的字典对象
-            bno:          楼栋号(7 或 8)
+            bno:          楼栋号(7 或 8)                  unicode
             """
             for sec in range(1, 15):
                 if int(bno) == 7:
                     room_list = ALLROOM7
                 else:
                     room_list = ALLROOM8
-                weekday_list['%d' % sec] = room_list
+                weekday_list[u'%d' % sec] = room_list
 
         week = connection.Week.find_one({'weekNo': u'week%d'%week_no, 'bno': bno}) or connection.Week()
         week['weekNo'] = u'week%d'%week_no
         week['bno'] = bno
-        for wd in ['mon', 'tue', 'wed', 'thu', 'fri']:
+        for wd in [u'mon', u'tue', u'wed', u'thu', u'fri']:
             week[wd] = dict()
             init_weekdays(week[wd], bno)
         week.save()
 
     # 初始化上课教室
-    #for week_no in range(1, 21):
-    #    for bno in [u'7', u'8']:
-    #        init_week(week_no, bno)
+    if init:
+        for week_no in range(1, 21):
+            for bno in [u'7', u'8']:
+                init_week(week_no, bno)
 
-   # 添加所有上课的教室
+    # 添加所有上课的教室
     rows_counts = sheet.nrows
-    for row_no in range(rows_counts):
+    for row_no in range(rows_counts)[start_row:]:
         print "working on row: %d" % row_no
         values = sheet.row_values(row_no)
         times = values[:3]     # 上课时间 1-3
@@ -95,13 +99,16 @@ def update_each(sheet, connection, Week):
             loc = locs[i]
             if (not isinstance(loc, float)) or (int(loc//1000) not in [7, 8]):
                 break
-            loc = str(int(loc))
+            loc = u'%d' % int(loc)
             bno = loc[0]
 
             # 上课的星期(汉字: 一、二...)
             weekday = time[time.index(u'\u671f')+1]
             # 上课的节次
-            sec_li = list(int(i) for i in time[time.index(u'\u7b2c')+1:time.index(u'\u8282')].split('-'))
+            try:
+                sec_li = list(int(i) for i in time[time.index(u'\u7b2c')+1:time.index(u'\u8282')].split('-'))
+            except ValueError:
+                continue
             secs = range(sec_li[0], sec_li[1]+1)
             # 上课的周次
             week_li = list(int(i) for i in time[time.index('{')+1:time.index(u'\u5468')].split('-'))
@@ -114,16 +121,24 @@ def update_each(sheet, connection, Week):
                 weeks = list(each for each in range(week_li[0], week_li[1]+1))
 
             for each_week in weeks:
-                found_week = connection.Week.find_one({'weekNo': 'week%d'%each_week, 'bno': bno})
+                if each_week > 20:
+                    # 超过20周的课不进行计算
+                    break
+                found_week = connection.Week.find_one({'weekNo': u'week%d'%each_week, 'bno': bno})
                 ewd = get_week_en(weekday)
+                if not ewd:
+                    # 星期六和星期日的课程不进行计算
+                    break
                 sec_room_dict = found_week[ewd] # 节次与教室的字典
                 for sec in secs:
                     try:
                         index = sec_room_dict[u'%d'%sec].index(loc)
-                        # 从空闲教室列表中删除该教室
-                        found_week[ewd][u'%d'%sec] = found_week[ewd][u'%d'%sec][:index] + found_week[ewd][u'%d'%sec][index+1:]
-                    except:
-                        pass
+                    except ValueError:
+                        # 列表中已经不存在这个教室
+                        print "{} in list weekno{} bno{} sec{}? {}".format(loc, each_week, bno, sec, loc in sec_room_dict[u'%d'%sec])
+                        break
+                    # 从空闲教室列表中删除该教室
+                    found_week[ewd][u'%d'%sec] = found_week[ewd][u'%d'%sec][:index] + found_week[ewd][u'%d'%sec][index+1:]
                 found_week.save()
 
 
@@ -149,28 +164,21 @@ if __name__ == '__main__':
     from mongokit import Connection, Document
 
     class Week(Document):
-        """
-        :class: Week
-
-        每周空闲教室存储
-        """
         __collection__ = 'weeks'
         __database__ = 'weekdb'
         structure = {
-                'bno': unicode, # 楼栋号
-                'weekNo': unicode, # 周号
-                'mon': dict, # 这周每天的教室情况
+                'bno': unicode,
+                'weekNo': unicode,
+                'mon': dict,
                 'tue': dict,
                 'wed': dict,
                 'thu': dict,
                 'fri': dict
         }
-
-    def __repr__(self):
-        return '<Mongo Week bno:{} weekNo:{}>'.format(self['bno'], self['weekNo'])
+        def __repr__(self):
+            return '<Mongo Week bno:{} weekNo:{}>'.format(self['bno'], self['weekNo'])
     data = xlrd.open_workbook(os.getenv("TABLE_PATH"))
     all_sheets = data.sheets()
     connection = Connection(os.getenv("MONGOHOST"), int(os.getenv("MONGOPORT")))
     connection.register([Week])
-    update_sheets(all_sheets, connection, Week)
-
+    update_sheets(all_sheets, connection, Week, False, start_sheet=input("start_sheet: "), start_row=input("start_row: "))
